@@ -1,2 +1,3 @@
-# pdf_renamer
-Renames PDFs based on file contents and metadata, to make ZotFile work
+# zotero_utils
+
+Various scripts to do things with Zotero.
