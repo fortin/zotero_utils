@@ -191,3 +191,5 @@ pdfs.txt
 zotero_utils.zip
 
 My Library.bib
+
+zotero_sql_tools/delete_broken_attachments.sql
