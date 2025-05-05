@@ -172,3 +172,22 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+.DS_Store
+
+# --- Zotero / Literature linker specific ---
+linked_items.csv
+logs/
+hook_link_log.csv
+hook_link_debug.txt
+sanity_check_report.csv
+sqlite_broken_links_report.csv
+broken_attachments.csv
+new_attachments.csv
+devonthink_links.csv
+pdfs.txt
+*.bak
+*.tmp
+zotero_utils.zip
+
+My Library.bib
