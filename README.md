@@ -56,10 +56,10 @@ SCRIPT_PATH=/Users/yourname/zotero_utils/standardise_item_types.py
 python create_lit_note.py <citekey>
 ```
 
-	•	Creates or updates a note in the appropriate folder inside the Obsidian vault.
-	•	Searches DEVONthink for the PDF and adds a link if found.
-	•	Updates the `linked_items.csv` cache.
-	•	Creates Hookmark links between the note, the DEVONthink PDF, and the Zotero item.
+	- Creates or updates a note in the appropriate folder inside the Obsidian vault.
+	- Searches DEVONthink for the PDF and adds a link if found.
+	- Updates the `linked_items.csv` cache.
+	- Creates Hookmark links between the note, the DEVONthink PDF, and the Zotero item.
 
 ### 2️⃣ Hook all items incrementally (batch)
 
@@ -67,16 +67,17 @@ python create_lit_note.py <citekey>
 python hook_links.py
 ```
 
-	•	Iterates over all BibTeX citekeys.
-	•	Ensures Hookmark links exist between Zotero, DEVONthink, and the Obsidian note.
-	•	Refreshes any missing or outdated cache entries automatically.
+	- Iterates over all BibTeX citekeys.
+	- Ensures Hookmark links exist between Zotero, DEVONthink, and the Obsidian note.
+	- Refreshes any missing or outdated cache entries automatically.
 
 
 ## 🔗 Alfred Workflows
 
 You can integrate both main scripts with Alfred for fast access.
-	•	`create_lit_note.py` → [Literature Linker](https://github.com/fortin/alfred-workflows/blob/main/Literature%20Linker.alfredworkflow)
-	•	`hook_links.py` → [Hook Zotero-Obsidian-PDF](https://github.com/fortin/alfred-workflows/blob/main/Hook%20Zotero-Obsidian-PDF.alfredworkflow)
+
+	- `create_lit_note.py` → [Literature Linker](https://github.com/fortin/alfred-workflows/blob/main/Literature%20Linker.alfredworkflow)
+	- `hook_links.py` → [Hook Zotero-Obsidian-PDF](https://github.com/fortin/alfred-workflows/blob/main/Hook%20Zotero-Obsidian-PDF.alfredworkflow)
 
 These allow you to create and link notes directly from Alfred using citekeys.
 
