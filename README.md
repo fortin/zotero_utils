@@ -71,20 +71,6 @@ python hook_links.py
 	•	Ensures Hookmark links exist between Zotero, DEVONthink, and the Obsidian note.
 	•	Refreshes any missing or outdated cache entries automatically.
 
-## 📂 Folder Structure
-
-```plaintext
-zotero_utils/
-├── create_lit_note.py
-├── hook_links.py
-├── standardise_item_types.py
-├── linked_items.csv
-├── logs/
-├── My Library.bib
-├── .env
-├── README.md
-└── [optional older scripts...]
-```
 
 ## 🔗 Alfred Workflows
 
