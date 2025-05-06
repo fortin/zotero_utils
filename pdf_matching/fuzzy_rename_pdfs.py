@@ -1,25 +1,21 @@
-import csv
 import re
-from difflib import SequenceMatcher
+import csv
 from pathlib import Path
-
 import bibtexparser
+from difflib import SequenceMatcher
 from decouple import config
 
 # === CONFIG ===
 bib_path = Path(config("BIB_PATH"))
 pdf_dir = Path(config("PDF_FOLDER"))
-log_path = pdf_dir.parent / "logs/fuzzy_rename_log.csv"
+log_path = pdf_dir.parent / "fuzzy_rename_log.csv"
 dry_run = True  # Set to False to actually rename files
 
-
 def normalize(text):
-    return re.sub(r"\W+", "", text.lower())
-
+    return re.sub(r'\W+', '', text.lower())
 
 def fuzzy_match(a, b):
     return SequenceMatcher(None, a, b).ratio()
-
 
 # Load BibTeX entries
 with open(bib_path, "r", encoding="utf-8") as f:
@@ -31,14 +27,12 @@ for entry in bib_db.entries:
     author = entry.get("author", "").split(" and ")[0].split(",")[0].strip()
     year = entry.get("year", "").strip()
     title = entry.get("title", "").strip().split(":")[0]
-    entries.append(
-        {
-            "key": key,
-            "author": normalize(author),
-            "year": year,
-            "title": normalize(" ".join(title.split()[:5])),
-        }
-    )
+    entries.append({
+        "key": key,
+        "author": normalize(author),
+        "year": year,
+        "title": normalize(" ".join(title.split()[:5]))
+    })
 
 # Scan and match PDFs
 log = []
@@ -69,32 +63,26 @@ for pdf in pdf_dir.glob("*.pdf"):
             print(f"{pdf} renamed to {new_path}")
             pdf.rename(new_path)
             result = "✓ Renamed"
-        log.append(
-            {
-                "Original": pdf.name,
-                "New": new_name,
-                "CitationKey": best_match["key"],
-                "Score": f"{best_score:.2f}",
-                "Result": result,
-            }
-        )
+        log.append({
+            "Original": pdf.name,
+            "New": new_name,
+            "CitationKey": best_match["key"],
+            "Score": f"{best_score:.2f}",
+            "Result": result
+        })
     else:
         print(f"Failed to rename {pdf}")
-        log.append(
-            {
-                "Original": pdf.name,
-                "New": "",
-                "CitationKey": "",
-                "Score": "0.00",
-                "Result": "❌ No match",
-            }
-        )
+        log.append({
+            "Original": pdf.name,
+            "New": "",
+            "CitationKey": "",
+            "Score": "0.00",
+            "Result": "❌ No match"
+        })
 
 # Write log
 with open(log_path, "w", newline="", encoding="utf-8") as f:
-    writer = csv.DictWriter(
-        f, fieldnames=["Original", "New", "CitationKey", "Score", "Result"]
-    )
+    writer = csv.DictWriter(f, fieldnames=["Original", "New", "CitationKey", "Score", "Result"])
     writer.writeheader()
     writer.writerows(log)
 

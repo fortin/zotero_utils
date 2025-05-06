@@ -2,15 +2,15 @@ import argparse
 import os
 import re
 import subprocess
+import json
 from pathlib import Path
 
-import bibtexparser
 import pandas as pd
 from decouple import config
 
 # === CONFIGURATION ===
 base_dir = Path(__file__).parent.resolve()
-bib_path = Path(config("BIB_PATH"))
+json_path = Path(config("CSL_JSON_PATH"))
 log_path = base_dir / "logs/hook_link_log.csv"
 debug_path = base_dir / "logs/hook_link_debug.txt"
 cache_path = Path(config("LINKED_ITEMS"))
@@ -37,20 +37,12 @@ def safe_hook_link(a, b):
 
 
 def refresh_cache(citekey):
-    """Run create_lit_note.py to refresh cache for a given citekey."""
-    # print(f"🔄 Cache missing or incomplete for {citekey}. Refreshing...")
     subprocess.run(
         [python_path, "create_lit_note.py", citekey],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
 
-
-# === RUN PRE-SCRIPT IF CONFIGURED ===
-SCRIPT_PATH = config("SCRIPT_PATH", default=None)
-if SCRIPT_PATH:
-    print("Standardising item types...")
-    os.system(f"python '{SCRIPT_PATH}'")
 
 # === PREPARE DEBUG LOG ===
 with open(debug_path, "w", encoding="utf-8") as dbg:
@@ -62,37 +54,36 @@ if cache_path.exists():
 else:
     linked_df = pd.DataFrame(columns=["CitationKey", "Note_Link", "DEVONthink_Link"])
 
-# === LOAD BIB FILE ===
-with open(bib_path, "r", encoding="utf-8") as bibfile:
-    bib_database = bibtexparser.load(bibfile)
+# === LOAD CSL JSON ===
+with open(json_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+    entries = {e["id"]: e for e in data if "id" in e}
 
-all_entries = {entry["ID"]: entry for entry in bib_database.entries}
-all_citekeys = list(all_entries.keys())
+# Lowercase lookup table for case-insensitive matching
+all_citekeys = {k.lower(): k for k in entries.keys()}
 
 if args.citekey:
-    if args.citekey not in all_citekeys:
-        print(f"❌ Citation key {args.citekey} not found in .bib file.")
+    key_lc = args.citekey.lower()
+    if key_lc not in all_citekeys:
+        print(f"❌ Citation key {args.citekey} not found in CSL JSON.")
         exit(1)
-    citekeys = [args.citekey]
+    citekeys = [all_citekeys[key_lc]]
 else:
-    citekeys = all_citekeys
+    citekeys = list(entries.keys())
 
 linked, skipped = [], []
 
 # === PROCESS EACH CITEKEY ===
 for key in citekeys:
-    entry = all_entries[key]
-
     row = linked_df.loc[linked_df["CitationKey"] == key]
 
-    # === If missing or incomplete, refresh cache ===
+    # Refresh cache if missing or incomplete
     if (
         row.empty
         or pd.isna(row.iloc[0]["Note_Link"])
         or pd.isna(row.iloc[0]["DEVONthink_Link"])
     ):
         refresh_cache(key)
-        # Reload updated cache
         linked_df = pd.read_csv(cache_path)
         row = linked_df.loc[linked_df["CitationKey"] == key]
 

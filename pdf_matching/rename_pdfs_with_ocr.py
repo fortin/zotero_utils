@@ -1,28 +1,24 @@
-import csv
 import re
+import csv
 import subprocess
-from difflib import SequenceMatcher
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-
+from difflib import SequenceMatcher
+from pdfminer.high_level import extract_text
 import bibtexparser
 from decouple import config
-from pdfminer.high_level import extract_text
 
 # === CONFIG ===
 bib_path = Path(config("BIB_PATH"))
 pdf_dir = Path(config("PDF_FOLDER"))
-log_path = pdf_dir.parent / "logs/content_match_rename_log.csv"
+log_path = pdf_dir.parent / "content_match_rename_log.csv"
 dry_run = False  # Set to False to apply renames
 
-
 def normalize(text):
-    return re.sub(r"\W+", "", text.lower())
-
+    return re.sub(r'\W+', '', text.lower())
 
 def fuzzy_match(a, b):
     return SequenceMatcher(None, a, b).ratio()
-
 
 def extract_text_from_pdf(pdf_path, max_chars=1000):
     try:
@@ -30,7 +26,6 @@ def extract_text_from_pdf(pdf_path, max_chars=1000):
         return normalize(text[:max_chars])
     except Exception:
         return ""
-
 
 def ocr_and_extract_text(pdf_path, max_chars=1000):
     with NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
@@ -40,7 +35,7 @@ def ocr_and_extract_text(pdf_path, max_chars=1000):
             ["ocrmypdf", "--skip-text", "--force-ocr", str(pdf_path), str(temp_path)],
             check=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
         return extract_text_from_pdf(temp_path, max_chars), True
     except Exception:
@@ -48,7 +43,6 @@ def ocr_and_extract_text(pdf_path, max_chars=1000):
     finally:
         if temp_path.exists():
             temp_path.unlink(missing_ok=True)
-
 
 # Load BibTeX entries
 with open(bib_path, "r", encoding="utf-8") as f:
@@ -59,16 +53,14 @@ for entry in bib_db.entries:
     key = entry.get("ID", "").strip()
     if not key or key.startswith(":") or key.startswith("/") or "/" in key:
         continue
-    safe_key = re.sub(r'[\/:*?"<>|]', "_", key)
+    safe_key = re.sub(r'[\/:*?"<>|]', '_', key)
     author = entry.get("author", "").split(" and ")[0].split(",")[0].strip()
     title = entry.get("title", "").strip().split(":")[0]
-    entries.append(
-        {
-            "key": safe_key,
-            "author": normalize(author),
-            "title": normalize(" ".join(title.split()[:6])),
-        }
-    )
+    entries.append({
+        "key": safe_key,
+        "author": normalize(author),
+        "title": normalize(" ".join(title.split()[:6]))
+    })
 
 # Main loop
 log = []
@@ -81,15 +73,13 @@ for pdf in pdf_dir.glob("*.pdf"):
         content, used_ocr = ocr_and_extract_text(pdf)
 
     if not content:
-        log.append(
-            {
-                "Original": pdf.name,
-                "New": "",
-                "CitationKey": "",
-                "Score": "0.00",
-                "Result": "❌ Failed to read (even with OCR)",
-            }
-        )
+        log.append({
+            "Original": pdf.name,
+            "New": "",
+            "CitationKey": "",
+            "Score": "0.00",
+            "Result": "❌ Failed to read (even with OCR)"
+        })
         continue
 
     best_match = None
@@ -112,30 +102,24 @@ for pdf in pdf_dir.glob("*.pdf"):
             pdf.rename(new_path)
         elif new_path.exists():
             result = "⚠️ Exists — skipped"
-        log.append(
-            {
-                "Original": pdf.name,
-                "New": new_name,
-                "CitationKey": best_match["key"],
-                "Score": f"{best_score:.2f}",
-                "Result": f"{result}{' (OCR)' if used_ocr else ''}",
-            }
-        )
+        log.append({
+            "Original": pdf.name,
+            "New": new_name,
+            "CitationKey": best_match["key"],
+            "Score": f"{best_score:.2f}",
+            "Result": f"{result}{' (OCR)' if used_ocr else ''}"
+        })
     else:
-        log.append(
-            {
-                "Original": pdf.name,
-                "New": "",
-                "CitationKey": "",
-                "Score": "0.00",
-                "Result": "❌ No match (after OCR)" if used_ocr else "❌ No match",
-            }
-        )
+        log.append({
+            "Original": pdf.name,
+            "New": "",
+            "CitationKey": "",
+            "Score": "0.00",
+            "Result": "❌ No match (after OCR)" if used_ocr else "❌ No match"
+        })
 
 with open(log_path, "w", newline="", encoding="utf-8") as f:
-    writer = csv.DictWriter(
-        f, fieldnames=["Original", "New", "CitationKey", "Score", "Result"]
-    )
+    writer = csv.DictWriter(f, fieldnames=["Original", "New", "CitationKey", "Score", "Result"])
     writer.writeheader()
     writer.writerows(log)
 
