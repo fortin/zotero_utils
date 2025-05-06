@@ -3,39 +3,41 @@ import re
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+import json
 from pathlib import Path
 
-import bibtexparser
 import pandas as pd
 import yaml
 from decouple import config
 
 # === Load environment config ===
-bib_path = Path(config("BIB_PATH"))
+json_path = Path(config("CSL_JSON_PATH"))
 vault_path = Path(config("OBSIDIAN_VAULT"))
 linked_items_path = Path(os.environ.get("LINKED_ITEMS"))
 python_path = Path(os.environ.get("PYTHON_PATH"))
 
-# === RUN PRE-SCRIPT IF CONFIGURED ===
-SCRIPT_PATH = config("SCRIPT_PATH", default=None)
-if SCRIPT_PATH:
-    print("Standardising item types...")
-    os.system(f"{python_path} '{SCRIPT_PATH}'")
+MARKDOWN_IN_DEVONTHINK = (
+    config("MARKDOWN_IN_DEVONTHINK", default="False").lower() == "true"
+)
+PDF_IN_DEVONTHINK = config("PDF_IN_DEVONTHINK", default="True").lower() == "true"
 
 # === Parse citekey from Alfred Script Filter ===
 citekey = sys.argv[1].strip()
 
-# === Load .bib file ===
-with open(bib_path, "r", encoding="utf-8") as f:
-    bib_db = bibtexparser.load(f)
-    entries = {e["ID"]: e for e in bib_db.entries}
+# === Load CSL JSON ===
+with open(json_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+    entries = {e["id"]: e for e in data if "id" in e}
 
-if citekey not in entries:
+# === Case-insensitive key match ===
+lookup = {k.lower(): k for k in entries.keys()}
+if citekey.lower() not in lookup:
     print(f"❌ Citation key not found: {citekey}")
     sys.exit(1)
 
-entry = entries[citekey]
+true_key = lookup[citekey.lower()]
+entry = entries[true_key]
+citekey = true_key
 
 # === Load or initialise linked_items.csv ===
 if linked_items_path.exists():
@@ -44,30 +46,21 @@ else:
     linked_df = pd.DataFrame(columns=["CitationKey", "Note_Link", "DEVONthink_Link"])
 
 # === Determine note path ===
-bib_type = entry.get("ENTRYTYPE", "").lower()
-if bib_type in {
-    "article",
-    "conference",
-    "inbook",
-    "incollection",
-    "inproceedings",
-    "manuscript",
-}:
-    note_dir = (
-        vault_path
-        / "📁 500 📒 Notes/📁 520 🗒 Zettelkasten/522 📚 Source Material/532 📄 Articles"
-    )
-elif bib_type in {"book", "booklet", "masterthesis", "phdthesis", "proceedings"}:
-    note_dir = (
-        vault_path
-        / "📁 500 📒 Notes/📁 520 🗒 Zettelkasten/522 📚 Source Material/542 📖 Books"
-    )
-else:
-    note_dir = (
-        vault_path
-        / "📁 500 📒 Notes/📁 520 🗒 Zettelkasten/522 📚 Source Material/572 ⺟ Other"
-    )
+type_map = {
+    "article-journal": "532 📄 Articles",
+    "paper-conference": "532 📄 Articles",
+    "chapter": "532 📄 Articles",
+    "book": "542 📖 Books",
+    "thesis": "542 📖 Books",
+}
+entry_type = entry.get("type", "").lower()
+folder_name = type_map.get(entry_type, "572 ⺟ Other")
 
+note_dir = (
+    vault_path
+    / "📁 500 📒 Notes/📁 520 🗒 Zettelkasten/522 📚 Source Material"
+    / folder_name
+)
 note_path = note_dir / f"@{citekey}.md"
 
 
@@ -91,30 +84,42 @@ def find_devonthink_link(search_string):
         return None
 
 
-filename = ""
-if "file" in entry:
-    m = re.search(r"([^:]+\.pdf)", entry["file"], re.IGNORECASE)
-    if m:
-        filename = m.group(1)
+# === Build search string ===
+filename = entry.get("note", "")
+filename_match = re.search(r"([^/]+\.pdf)", filename) if filename else None
 
-if filename:
-    search_term = Path(filename).stem
+if filename_match:
+    search_term = Path(filename_match.group(1)).stem
     search_term = re.sub(r"[_\-=:.]+", " ", search_term).strip()
-    search_term = re.sub(r"\s+", " ", search_term).strip()
-    print(f"🔍 DEVONthink search term (filename): {search_term}")
 else:
     authors = entry.get("author", "")
+    if isinstance(authors, list):
+        authors = " ".join([a.get("family", "") for a in authors])
     title = entry.get("title", "")
     search_term = f"{authors} {title}".strip()
-    search_term = re.sub(r"[_\-:=]+", " ", search_term)
-    print(f"🔍 DEVONthink search term (author/title): {search_term}")
 
-devonthink_link = find_devonthink_link(search_term) or ""
+search_term = re.sub(r"\s+", " ", search_term)
+print(f"🔍 DEVONthink search term: {search_term}")
 
-if devonthink_link:
-    print(f"✅ Found DEVONthink link: {devonthink_link}")
+# === DEVONthink or filesystem links ===
+devonthink_note_link = (
+    find_devonthink_link(Path(note_path).name) if MARKDOWN_IN_DEVONTHINK else ""
+)
+if devonthink_note_link:
+    print(f"✅ Found DEVONthink note link.")
 else:
-    print("⚠ DEVONthink link not found.")
+    if MARKDOWN_IN_DEVONTHINK:
+        print("⚠ Note not indexed in DEVONthink, falling back to Obsidian link.")
+    devonthink_note_link = ""
+
+# PDF search
+devonthink_pdf_link = find_devonthink_link(search_term) if PDF_IN_DEVONTHINK else ""
+if devonthink_pdf_link:
+    print(f"✅ Found DEVONthink PDF link.")
+else:
+    if PDF_IN_DEVONTHINK:
+        print("⚠ PDF not found in DEVONthink. Falling back to Finder link or none.")
+    devonthink_pdf_link = ""
 
 # === Read or create YAML frontmatter ===
 if note_path.exists():
@@ -132,34 +137,56 @@ if "uid" not in metadata:
     metadata["uid"] = str(uuid.uuid4())
     print(f"🆕 Generating new UID: {metadata['uid']}")
 
-# === Year handling (proper fallback to 'date' field if needed) ===
-year = entry.get("year", "").strip()
-if not year:
-    date_field = entry.get("date", "").strip()
-    year_match = re.search(r"\d{4}", date_field)
-    year = year_match.group(0) if year_match else "n.d."
+# === Year handling ===
+year = entry.get("issued", {}).get("date-parts", [[None]])[0][0] or "n.d."
+
+# === Authors ===
+if "author" in entry:
+    author_names = []
+    for author in entry["author"]:
+        family = author.get("family", "")
+        given = author.get("given", "")
+        author_names.append(f"{family}, {given}".strip(", "))
+    authors = "; ".join(author_names)
+else:
+    authors = ""
+
+# === DOI ===
+doi = entry.get("DOI", "")
 
 # === Update metadata ===
 metadata.update(
     {
         "title": f"@{citekey}",
-        "authors": entry.get("author", ""),
+        "authors": authors,
         "citation": f"@{citekey}",
         "year": year,
-        "DOI": entry.get("doi", ""),
+        "DOI": doi,
         "tags": ["literature", "ToRead"],
         "URI": f"zotero://select/items/@{citekey}",
         "uid": metadata["uid"],
     }
 )
 
+# === Preferred Note Link ===
+if MARKDOWN_IN_DEVONTHINK and devonthink_note_link:
+    note_link_display = f"[Open Note in DEVONthink]({devonthink_note_link})"
+else:
+    note_link_display = f"[Open in Obsidian]({metadata['URI']})"
+
+# === Preferred PDF Link ===
+if PDF_IN_DEVONTHINK and devonthink_pdf_link:
+    pdf_link_display = f"[Open PDF in DEVONthink]({devonthink_pdf_link})"
+else:
+    pdf_link_display = "PDF not linked yet"
+
 note_body = f"""---
 {yaml.dump(metadata, sort_keys=False).strip()}
 ---
 
-📎 [Open in Zotero]({metadata['URI']})
+📎 {note_link_display}
 
-📄 {"[Open PDF in DEVONthink](" + devonthink_link + ")" if devonthink_link else "PDF not linked yet"}
+📄 {pdf_link_display}
 
 ## Summary
 -
@@ -184,13 +211,16 @@ with open(note_path, "w", encoding="utf-8") as f:
 print(f"✅ Note created/updated: {note_path}")
 
 # === Update linked_items.csv for this citekey ===
-note_uri = f"hook://file/{note_path.resolve()}"
+note_uri = (
+    devonthink_note_link
+    if devonthink_note_link
+    else f"hook://file/{note_path.resolve()}"
+)
+pdf_uri = devonthink_pdf_link if devonthink_pdf_link else ""
 
 if citekey in linked_df["CitationKey"].values:
     linked_df.loc[linked_df["CitationKey"] == citekey, "Note_Link"] = note_uri
-    linked_df.loc[linked_df["CitationKey"] == citekey, "DEVONthink_Link"] = (
-        devonthink_link
-    )
+    linked_df.loc[linked_df["CitationKey"] == citekey, "DEVONthink_Link"] = pdf_uri
 else:
     linked_df = pd.concat(
         [
@@ -200,7 +230,7 @@ else:
                     {
                         "CitationKey": citekey,
                         "Note_Link": note_uri,
-                        "DEVONthink_Link": devonthink_link,
+                        "DEVONthink_Link": pdf_uri,
                     }
                 ]
             ),
@@ -208,7 +238,7 @@ else:
         ignore_index=True,
     )
 
-# === NEW: Ensure all BibTeX citekeys are in the cache, even if no note/link ===
+# === Ensure all CSL JSON citekeys are in the cache ===
 for other_key in entries:
     if other_key not in linked_df["CitationKey"].values:
         linked_df = pd.concat(
@@ -228,11 +258,11 @@ print("🔄 linked_items.csv updated.")
 hook = "/usr/local/bin/hook"
 args = [hook, "link", note_uri]
 
-if devonthink_link:
-    args.append(devonthink_link)
+if pdf_uri:
+    args.append(pdf_uri)
 
 args.append(metadata["URI"])
 
 subprocess.run(args)
 
-print(f"🔗 Hooked: {note_uri} ⇄ {devonthink_link} ⇄ {metadata['URI']}")
+print(f"🔗 Hooked: {note_uri} ⇄ {pdf_uri} ⇄ {metadata['URI']}")

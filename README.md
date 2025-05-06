@@ -8,6 +8,7 @@ _Optimized for high-volume literature note-taking and PDF management._
 ## 📝 Overview
 
 This toolkit automates:
+
 - Creating and updating **literature notes** in Obsidian based on your Zotero library.
 - Searching DEVONthink for matching PDFs and linking them to the notes.
 - Creating **Hookmark** connections between Zotero, Obsidian notes, and DEVONthink PDFs.
@@ -22,31 +23,44 @@ This toolkit automates:
   - `pandas`
   - `pyyaml`
   - `python-decouple`
-- **Zotero** (with auto-export of `.bib` file including `citekey` and `file` fields)
-- **Obsidian** (Advanced URI plugin recommended)
+- **Zotero**  
+  (Export your library as a Better CSL JSON `.json` with `Keep updated` enabled.)
+- **Obsidian**  
+  (Advanced URI plugin recommended)
 - **DEVONthink** (with scripting enabled)
 - **Hookmark**
 - **Hook CLI** ([available here](https://brettterpstra.com/projects/hook-cli/))
 - **Alfred** (for optional automation)
 
-## 🔨 Setup
-
-Install the Better BibTeX plugin in Zotero and then export your library to a Better BibTeX or Better BibLaTeX `.bib` file. Make sure you select `keep updated` so that any changes you make in Zotero are immediately reflected in the `.bib` file. Add the path as `BIB_PATH` in your `.env` file (see below). This will allow queries and operations to happen on local rather than the much slower and less reliable Zotero Web API.
-
 ---
 
-## 🔑 Environment Variables (`.env`)
+## 🔨 Setup
 
-Create a `.env` file in the root of the project:
+1. **In Zotero**  
+   - Install the **Better BibTeX** plugin.
+   - Export your library as **Better CSL JSON** with **Keep updated** enabled.  
+     _(This prevents stale data and eliminates the need for manual exports.)_
 
-```bash
-BIB_PATH="/Users/yourname/zotero_utils/My Library.bib"
-OBSIDIAN_VAULT="/Users/yourname/Documents/My Vault"
-PYTHON_PATH=/Users/yourname/micromamba/envs/zotero/bin/python
-LINKED_ITEMS=/Users/yourname/zotero_utils/linked_items.csv
-HOOK_PATH=/usr/local/bin/hook
-SCRIPT_PATH=/Users/yourname/zotero_utils/standardise_item_types.py
-```
+2. **Environment Variables**  
+   Create a `.env` file in the root of the project:
+
+   ```bash
+   CSL_JSON_PATH="/Users/yourname/zotero_utils/My Library.json"
+   OBSIDIAN_VAULT="/Users/yourname/Documents/My Vault"
+   PYTHON_PATH=/Users/yourname/micromamba/envs/zotero/bin/python
+   LINKED_ITEMS=/Users/yourname/zotero_utils/linked_items.csv
+   HOOK_PATH=/usr/local/bin/hook
+   SCRIPT_PATH=/Users/yourname/zotero_utils/standardise_item_types.py
+   MARKDOWN_IN_DEVONTHINK=False  # or True
+   PDF_IN_DEVONTHINK=True        # or False
+   ```
+
+3. Linking Behavior (`MARKDOWN_IN_DEVONTHINK` & `PDF_IN_DEVONTHINK`)
+
+- `MARKDOWN_IN_DEVONTHINK=True` → Hook links will point to the note in DEVONthink (assuming it’s indexed there).
+- `MARKDOWN_IN_DEVONTHINK=False` → Hook links will point to the note in Obsidian.
+- `PDF_IN_DEVONTHINK=True` → Hook links will point to the PDF in DEVONthink (assuming indexed).
+- `PDF_IN_DEVONTHINK=False` → Hook links will point directly to the PDF in Finder.
 
 ## 🔄 Typical Workflow
 
@@ -56,10 +70,10 @@ SCRIPT_PATH=/Users/yourname/zotero_utils/standardise_item_types.py
 python create_lit_note.py <citekey>
 ```
 
-	- Creates or updates a note in the appropriate folder inside the Obsidian vault.
-	- Searches DEVONthink for the PDF and adds a link if found.
-	- Updates the `linked_items.csv` cache.
-	- Creates Hookmark links between the note, the DEVONthink PDF, and the Zotero item.
+- Creates or updates a note in the appropriate folder inside the Obsidian vault.
+- Searches DEVONthink for the PDF and adds a link if found.
+- Updates the `linked_items.csv` cache.
+- Creates Hookmark links between the note, the DEVONthink PDF, and the Zotero item.
 
 ### 2️⃣ Hook all items incrementally (batch)
 
@@ -67,21 +81,21 @@ python create_lit_note.py <citekey>
 python hook_links.py
 ```
 
-	- Iterates over all BibTeX citekeys.
-	- Ensures Hookmark links exist between Zotero, DEVONthink, and the Obsidian note.
-	- Refreshes any missing or outdated cache entries automatically.
-
+- Iterates over all CSL JSON citekeys.
+- Ensures Hookmark links exist between Zotero, DEVONthink, and the Obsidian note.
+- Refreshes any missing or outdated cache entries automatically.
 
 ## 🔗 Alfred Workflows
 
 You can integrate both main scripts with Alfred for fast access.
 
-	- `create_lit_note.py` → [Literature Linker](https://github.com/fortin/alfred-workflows/blob/main/Literature%20Linker.alfredworkflow)
-	- `hook_links.py` → [Hook Zotero-Obsidian-PDF](https://github.com/fortin/alfred-workflows/blob/main/Hook%20Zotero-Obsidian-PDF.alfredworkflow)
+- `create_lit_note.py` → Literature Linker
+- `hook_links.py` → Hook Zotero-Obsidian-PDF
 
-These allow you to create and link notes directly from Alfred using citekeys.
+_These allow you to create and link notes directly from Alfred using citekeys._
 
 ## 🧠 Template for Obsidian Literature Notes
+
 (For use with the Templater plugin in Obsidian)
 
 ```markdown
@@ -125,7 +139,7 @@ tags: [[literature]]
 ---
 
 📎 [Open in Zotero](<%* tR += zoteroURI %>)
-📄 [Open PDF](/Users/antonio/Dropbox/Documents/DocumentLibrary/BibDesk/${citekey}.pdf)
+📄 [Open PDF](/path/to/pdf_folder/${citekey}.pdf)
 
 ## Summary
 -
@@ -161,14 +175,15 @@ tags: [[literature]]
 
 +---------------------------------------------------------+
 | hook_links.py                                           |
-| - Links Zotero ⇄ DEVONthink ⇄ Obsidian note            |
+| - Links Zotero ⇄ DEVONthink ⇄ Obsidian note             |
 | - Refreshes missing cache entries                       |
 +---------------------------------------------------------+
 ```
 
 ## ⚡ Pro Tip
 
-You can run both scripts in Alfred or Raycast workflows, and with the caching system (`linked_items.csv`), performance scales well even with thousands of Zotero entries.
+- You can run both scripts in Alfred or Raycast workflows.
+- With the caching system (`linked_items.csv`), performance scales well even with thousands of Zotero entries.
 
 ## 📜 License
 

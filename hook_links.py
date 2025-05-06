@@ -16,8 +16,14 @@ debug_path = base_dir / "logs/hook_link_debug.txt"
 cache_path = Path(config("LINKED_ITEMS"))
 hook_path = config("HOOK_PATH")
 python_path = Path(config("PYTHON_PATH"))
+vault_path = Path(config("OBSIDIAN_VAULT"))
 
-# === ARGPARSE FOR DRY-RUN AND CITEKEY ===
+MARKDOWN_IN_DEVONTHINK = (
+    config("MARKDOWN_IN_DEVONTHINK", default="False").lower() == "true"
+)
+PDF_IN_DEVONTHINK = config("PDF_IN_DEVONTHINK", default="False").lower() == "true"
+
+# === ARGPARSE ===
 parser = argparse.ArgumentParser(
     description="Hook Zotero, Obsidian, and DEVONthink PDFs via Hookmark incrementally."
 )
@@ -44,6 +50,23 @@ def refresh_cache(citekey):
     )
 
 
+def devonthink_link_for_path(path: Path):
+    search_term = path.stem
+    search_term = re.sub(r"[_\-=:.]+", " ", search_term).strip()
+    search_term = re.sub(r"\s+", " ", search_term)
+    script = f"""
+    tell application id "DNtp"
+        set theRecords to search "{search_term}"
+        if theRecords is not {{}} then
+            return reference URL of (item 1 of theRecords)
+        end if
+    end tell
+    """
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    link = result.stdout.strip()
+    return link if link.startswith("x-devonthink-item://") else None
+
+
 # === PREPARE DEBUG LOG ===
 with open(debug_path, "w", encoding="utf-8") as dbg:
     dbg.write("🔍 Hook Linking Debug Log\n\n")
@@ -59,15 +82,14 @@ with open(json_path, "r", encoding="utf-8") as f:
     data = json.load(f)
     entries = {e["id"]: e for e in data if "id" in e}
 
-# Lowercase lookup table for case-insensitive matching
-all_citekeys = {k.lower(): k for k in entries.keys()}
+lookup = {k.lower(): k for k in entries.keys()}
 
 if args.citekey:
     key_lc = args.citekey.lower()
-    if key_lc not in all_citekeys:
+    if key_lc not in lookup:
         print(f"❌ Citation key {args.citekey} not found in CSL JSON.")
         exit(1)
-    citekeys = [all_citekeys[key_lc]]
+    citekeys = [lookup[key_lc]]
 else:
     citekeys = list(entries.keys())
 
@@ -77,7 +99,6 @@ linked, skipped = [], []
 for key in citekeys:
     row = linked_df.loc[linked_df["CitationKey"] == key]
 
-    # Refresh cache if missing or incomplete
     if (
         row.empty
         or pd.isna(row.iloc[0]["Note_Link"])
@@ -90,6 +111,28 @@ for key in citekeys:
     note_uri = row.iloc[0]["Note_Link"] if not row.empty else ""
     devonthink_link = row.iloc[0]["DEVONthink_Link"] if not row.empty else ""
     zot_uri = f"zotero://select/items/@{key}"
+
+    # Apply MARKDOWN_IN_DEVONTHINK setting
+    if MARKDOWN_IN_DEVONTHINK and pd.notna(note_uri):
+        md_filename = note_uri.replace("hook://file/", "")
+        md_path = Path(md_filename)
+        dt_md_link = devonthink_link_for_path(md_path)
+        if dt_md_link:
+            note_uri = dt_md_link
+
+    # Apply PDF_IN_DEVONTHINK setting
+    pdf_link = ""
+    entry = entries[key]
+    note_field = entry.get("note", "")
+    filename_match = re.search(r"([^/]+\.pdf)", note_field) if note_field else None
+    if filename_match:
+        pdf_filename = filename_match.group(1)
+        if PDF_IN_DEVONTHINK:
+            dt_pdf_link = devonthink_link_for_path(Path(pdf_filename))
+            if dt_pdf_link:
+                pdf_link = dt_pdf_link
+        else:
+            pdf_link = f"file://{pdf_filename}"
 
     with open(debug_path, "a", encoding="utf-8") as dbg:
         dbg.write(f"== {key} ==\n")
