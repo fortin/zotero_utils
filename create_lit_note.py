@@ -157,7 +157,7 @@ doi = entry.get("DOI", "")
 # === Update metadata ===
 metadata.update(
     {
-        "title": f"@{citekey}",
+        "title": entry.get("title", citekey),
         "authors": authors,
         "citation": f"@{citekey}",
         "year": year,
