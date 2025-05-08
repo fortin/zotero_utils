@@ -13,6 +13,9 @@ from decouple import config
 # === Load environment config ===
 json_path = Path(config("CSL_JSON_PATH"))
 vault_path = Path(config("OBSIDIAN_VAULT"))
+source_material = config("SOURCE_MATERIAL")
+articles = config("ARTICLES")
+books = config("BOOKS")
 linked_items_path = Path(os.environ.get("LINKED_ITEMS"))
 python_path = Path(os.environ.get("PYTHON_PATH"))
 
@@ -47,20 +50,16 @@ else:
 
 # === Determine note path ===
 type_map = {
-    "article-journal": "532 📄 Articles",
-    "paper-conference": "532 📄 Articles",
-    "chapter": "532 📄 Articles",
-    "book": "542 📖 Books",
-    "thesis": "542 📖 Books",
+    "article-journal": articles,
+    "paper-conference": articles,
+    "chapter": articles,
+    "book": books,
+    "thesis": books,
 }
 entry_type = entry.get("type", "").lower()
 folder_name = type_map.get(entry_type, "572 ⺟ Other")
 
-note_dir = (
-    vault_path
-    / "📁 500 📒 Notes/📁 520 🗒 Zettelkasten/522 📚 Source Material"
-    / folder_name
-)
+note_dir = vault_path / source_material / folder_name
 note_path = note_dir / f"@{citekey}.md"
 
 
