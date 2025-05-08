@@ -85,7 +85,9 @@ def find_devonthink_link(search_string):
 
 # === Build search string ===
 filename = entry.get("note", "")
-filename_match = re.search(r"([^/]+\.pdf)", filename) if filename else None
+filename_match = (
+    re.search(r"([^/]+\.(pdf|epub))", filename, re.IGNORECASE) if filename else None
+)
 
 if filename_match:
     search_term = Path(filename_match.group(1)).stem
@@ -265,3 +267,8 @@ args.append(metadata["URI"])
 subprocess.run(args)
 
 print(f"🔗 Hooked: {note_uri} ⇄ {pdf_uri} ⇄ {metadata['URI']}")
+print(f"TITLE_FOR_OMNIFOCUS::{entry.get('title', citekey)}")
+print(f"AUTHOR_FOR_OMNIFOCUS::{authors}")
+print(f"NOTE_URI::{note_uri}")
+print(f"PDF_URI::{pdf_uri}")
+print(f"ZOTERO_URI::{metadata['URI']}")

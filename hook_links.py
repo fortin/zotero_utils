@@ -124,7 +124,11 @@ for key in citekeys:
     pdf_link = ""
     entry = entries[key]
     note_field = entry.get("note", "")
-    filename_match = re.search(r"([^/]+\.pdf)", note_field) if note_field else None
+    filename_match = (
+        re.search(r"([^/]+\.(pdf|epub))", note_field, re.IGNORECASE)
+        if note_field
+        else None
+    )
     if filename_match:
         pdf_filename = filename_match.group(1)
         if PDF_IN_DEVONTHINK:
