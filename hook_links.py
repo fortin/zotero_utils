@@ -1,15 +1,15 @@
 import argparse
+import json
 import os
 import re
 import subprocess
-import json
 from pathlib import Path
 
 import pandas as pd
 from decouple import config
 
 # === CONFIGURATION ===
-base_dir = Path(__file__).parent.resolve()
+base_dir = Path(config("BASE_DIR"))
 json_path = Path(config("CSL_JSON_PATH"))
 log_path = base_dir / "logs/hook_link_log.csv"
 debug_path = base_dir / "logs/hook_link_debug.txt"
