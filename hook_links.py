@@ -50,21 +50,49 @@ def refresh_cache(citekey):
     )
 
 
-def devonthink_link_for_path(path: Path):
-    search_term = path.stem
-    search_term = re.sub(r"[_\-=:.]+", " ", search_term).strip()
-    search_term = re.sub(r"\s+", " ", search_term)
-    script = f"""
+def find_devonthink_doc_link(entry, citekey):
+    authors = entry.get("author", [])
+    full_author = " ".join(
+        f"{a.get('given','')} {a.get('family','')}".strip()
+        for a in authors
+        if isinstance(a, dict)
+    ).strip()
+    title = entry.get("title", "")
+    search_1 = f"{full_author} {title}".strip()
+    search_1 = re.sub(r"\s+", " ", search_1)
+
+    script_template = """
     tell application id "DNtp"
-        set theRecords to search "{search_term}"
-        if theRecords is not {{}} then
-            return reference URL of (item 1 of theRecords)
-        end if
+        set theRecords to search "{query}"
+        repeat with theRecord in theRecords
+            set theName to name of theRecord
+            set theType to type of theRecord
+            if theType is not "markdown" then
+                return reference URL of theRecord
+            end if
+        end repeat
     end tell
     """
-    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
-    link = result.stdout.strip()
-    return link if link.startswith("x-devonthink-item://") else None
+
+    # First search: Full author name + title
+    result_1 = subprocess.run(
+        ["osascript", "-e", script_template.replace("{query}", search_1)],
+        capture_output=True,
+        text=True,
+    )
+    out1 = result_1.stdout.strip()
+    if out1.startswith("x-devonthink-item://"):
+        return out1
+
+    # Fallback: citekey
+    fallback_query = citekey
+    result_2 = subprocess.run(
+        ["osascript", "-e", script_template.replace("{query}", fallback_query)],
+        capture_output=True,
+        text=True,
+    )
+    out2 = result_2.stdout.strip()
+    return out2 if out2.startswith("x-devonthink-item://") else None
 
 
 # === PREPARE DEBUG LOG ===
@@ -120,23 +148,13 @@ for key in citekeys:
         if dt_md_link:
             note_uri = dt_md_link
 
-    # Apply PDF_IN_DEVONTHINK setting
+    # Improved PDF matching
     pdf_link = ""
     entry = entries[key]
-    note_field = entry.get("note", "")
-    filename_match = (
-        re.search(r"([^/]+\.(pdf|epub))", note_field, re.IGNORECASE)
-        if note_field
-        else None
-    )
-    if filename_match:
-        pdf_filename = filename_match.group(1)
-        if PDF_IN_DEVONTHINK:
-            dt_pdf_link = devonthink_link_for_path(Path(pdf_filename))
-            if dt_pdf_link:
-                pdf_link = dt_pdf_link
-        else:
-            pdf_link = f"file://{pdf_filename}"
+    if PDF_IN_DEVONTHINK:
+        dt_pdf_link = find_devonthink_doc_link(entry, key)
+        if dt_pdf_link:
+            pdf_link = dt_pdf_link
 
     with open(debug_path, "a", encoding="utf-8") as dbg:
         dbg.write(f"== {key} ==\n")
