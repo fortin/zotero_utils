@@ -16,6 +16,7 @@ vault_path = Path(config("OBSIDIAN_VAULT"))
 source_material = config("SOURCE_MATERIAL")
 articles = config("ARTICLES")
 books = config("BOOKS")
+other = config("OTHER")
 linked_items_path = Path(config("LINKED_ITEMS"))
 vault_name = vault_path.name
 
@@ -68,7 +69,7 @@ type_map = {
     "thesis": books,
 }
 entry_type = entry.get("type", "").lower()
-folder_name = type_map.get(entry_type, "572 ⺟ Other")
+folder_name = type_map.get(entry_type, other)
 note_dir = vault_path / source_material / folder_name
 note_path = note_dir / f"@{citekey}.md"
 
