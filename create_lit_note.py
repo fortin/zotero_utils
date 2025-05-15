@@ -68,7 +68,7 @@ type_map = {
     "thesis": books,
 }
 entry_type = entry.get("type", "").lower()
-folder_name = type_map.get(entry_type, "572 ⺡ Other")
+folder_name = type_map.get(entry_type, "572 ⺟ Other")
 note_dir = vault_path / source_material / folder_name
 note_path = note_dir / f"@{citekey}.md"
 
@@ -188,9 +188,9 @@ note_link = (
 note_body = f"""---
 {yaml.dump(metadata, sort_keys=False).strip()}
 ---
-
 📌 {note_link}
 📄 {pdf_backlink_md}
+<!-- OMNIFOCUS_LINK_PLACEHOLDER -->
 
 ## Summary
 -

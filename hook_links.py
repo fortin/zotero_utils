@@ -11,8 +11,8 @@ from decouple import config
 # === CONFIGURATION ===
 base_dir = Path(config("BASE_DIR"))
 json_path = Path(config("CSL_JSON_PATH"))
-log_path = base_dir / "logs/hook_link_log.csv"
-debug_path = base_dir / "logs/hook_link_debug.txt"
+log_path = Path(config("LOG_PATH")) / "/hook_link_log.csv"
+debug_path = Path(config("LOG_PATH")) / "/hook_link_debug.txt"
 cache_path = Path(config("LINKED_ITEMS"))
 hook_path = config("HOOK_PATH")
 python_path = Path(config("PYTHON_PATH"))
